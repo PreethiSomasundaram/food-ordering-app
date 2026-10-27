@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Online Food Ordering</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f4f4;
+            text-align: center;
+            margin: 30px;
+        }
+
+        h1, h2 {
+            color: #d35400;
+        }
+
+        input {
+            padding: 10px;
+            margin: 5px;
+        }
+
+        button {
+            padding: 10px;
+            margin: 5px;
+            background: #e67e22;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .card {
+            background: white;
+            padding: 15px;
+            margin: 10px auto;
+            max-width: 400px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px #ccc;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>Online Food Ordering System</h1>
+
+    <h2>Add Food Item</h2>
+
+    <input id="name" placeholder="Food Name">
+    <input id="price" type="number" min="0" step="0.01" placeholder="Price">
+    <button onclick="addFood()">Add Food</button>
+
+    <h2>Food Menu</h2>
+    <div id="menu"></div>
+
+    <h2>Place Customer Order</h2>
+
+    <input id="customer" placeholder="Customer Name">
+    <input id="food" placeholder="Food Name">
+    <button onclick="placeOrder()">Place Order</button>
+
+    <h2>Customer Orders</h2>
+    <div id="orders"></div>
+
+    <script>
+        async function loadFoods() {
+            const response = await fetch("/foods");
+            const foods = await response.json();
+
+            document.getElementById("menu").innerHTML =
+                foods.map(f => `
+                    <div class="card">
+                        <h3>${escapeHTML(f.name)}</h3>
+                        <p>Price: ₹${f.price}</p>
+                        <button onclick="editFood(${f.id})">Edit</button>
+                        <button onclick="deleteFood(${f.id})">Delete</button>
+                    </div>
+                `).join("");
+        }
+
+        function escapeHTML(value) {
+            return String(value).replace(/[&<>"']/g, char => ({
+                "&": "&amp;",
+                "<": "&lt;",
+                ">": "&gt;",
+                '"': "&quot;",
+                "'": "&#39;"
+            })[char]);
+        }
+
+        async function addFood() {
+            const name = document.getElementById("name").value.trim();
+            const input = document.getElementById("price").value;
+            const price = Number(input);
+
+            if (!name || input === "" || !Number.isFinite(price) || price < 0) {
+                alert("Enter a valid food name and price");
+                return;
+            }
+
+            const response = await fetch("/foods", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ name, price })
+            });
+
+            if (!response.ok) {
+                alert("Unable to add food");
+                return;
+            }
+
+            document.getElementById("name").value = "";
+            document.getElementById("price").value = "";
+
+            loadFoods();
+        }
+
+        async function editFood(id) {
+            const response = await fetch("/foods");
+            const foods = await response.json();
+            const item = foods.find(f => f.id === id);
+
+            if (!item) return;
+
+            const name = prompt("Enter food name:", item.name);
+            if (name === null || !name.trim()) return;
+
+            const input = prompt("Enter price:", item.price);
+            if (input === null || input.trim() === "") return;
+
+            const price = Number(input);
+
+            if (!Number.isFinite(price) || price < 0) {
+                alert("Enter a valid price");
+                return;
+            }
+
+            const result = await fetch("/foods/" + id, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ name: name.trim(), price })
+            });
+
+            if (!result.ok) {
+                alert("Unable to update food");
+                return;
+            }
+
+            loadFoods();
+        }
+
+        async function deleteFood(id) {
+            if (!confirm("Delete this food item?")) return;
+
+            const response = await fetch("/foods/" + id, {
+                method: "DELETE"
+            });
+
+            if (!response.ok) {
+                alert("Unable to delete food");
+                return;
+            }
+
+            loadFoods();
+        }
+
+        async function placeOrder() {
+            const customer = document.getElementById("customer").value.trim();
+            const food = document.getElementById("food").value.trim();
+
+            if (!customer || !food) {
+                alert("Enter customer name and food name");
+                return;
+            }
+
+            const response = await fetch("/orders", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ customer, food })
+            });
+
+            if (!response.ok) {
+                alert("Unable to place order");
+                return;
+            }
+
+            document.getElementById("customer").value = "";
+            document.getElementById("food").value = "";
+
+            loadOrders();
+        }
+
+        async function loadOrders() {
+            const response = await fetch("/orders");
+            const orders = await response.json();
+
+            document.getElementById("orders").innerHTML =
+                orders.map(o => `
+                    <div class="card">
+                        <h3>Order #${o.id}</h3>
+                        <p>Customer: ${escapeHTML(o.customer)}</p>
+                        <p>Food: ${escapeHTML(o.food)}</p>
+                    </div>
+                `).join("");
+        }
+
+        loadFoods();
+        loadOrders();
+    </script>
+
+</body>
+</html>
